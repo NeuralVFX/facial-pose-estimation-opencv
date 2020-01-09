@@ -8,17 +8,20 @@
 #include "opencv2/imgproc.hpp"
 
 
+using namespace std;
+
+
 class pose_points
 {
 
 public:
 	pose_points();
 
-	std::vector<cv::Mat>  blend_shapes;
+	vector<cv::Mat>  blend_shapes;
 	cv::Mat base_shape;
-	std::vector<int> triangulation_ids = { 18,2,24,33,36,42 };
+	vector<int> triangulation_ids = { 18,2,24,33,36,42 };
 	int tri_len = 6;
-	std::vector<cv::Point3d> get_pose(cv::Mat expression);
+	vector<cv::Point3d> get_pose(cv::Mat expression);
 
 	// array of points for base pose from maya file
 	float base_shape_arr[56][3] = { { -0.0377, -0.0691, 0.0275 },
