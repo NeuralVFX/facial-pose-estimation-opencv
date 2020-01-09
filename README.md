@@ -1,7 +1,7 @@
 ![](examples/unity_example.gif)
 # Facial-Pose-Estimation-OpenCV
 
-This project is a C++ implimentation of realtime facial and headpose tracking using OpenCV and DLIB.
+This project is a C++ implimentation of realtime facial and headpose tracking using OpenCV, DLIB and a custom Neural Net.
 
 ## Interesting Stuff
 
