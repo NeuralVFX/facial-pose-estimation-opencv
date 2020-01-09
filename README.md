@@ -10,7 +10,7 @@ This project is a C++ implimentation of realtime facial and headpose tracking us
 - Runs on a live video stream
 
 ## Estimation Pipeline Diagram
-![](examples/pipeline.png)
+![](examples/pipeline_b.png)
 
 ## Code Usage
 Usage instructions found here: [user manual page](USAGE.md).
