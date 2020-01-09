@@ -1,7 +1,6 @@
 #include "utils.h"
 
 
-
 utils::utils()
 {
 }
@@ -20,6 +19,7 @@ void utils::build_line(cv::Mat *image, cv::Mat x_points, cv::Mat y_points, vecto
 	cv::polylines(line_image, new_point_list, false, color, 1, cv::LINE_AA, 0);
 	cv::max(line_image, *image, *image);
 }
+
 
 float utils::clamp(float start_value, float low, float high)
 {

@@ -7,6 +7,7 @@
 
 Estimator PoseEstimator = Estimator();
 
+
 extern "C" int __declspec(dllexport) __stdcall  Init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw)
 {
 	return PoseEstimator.init(outCameraWidth, outCameraHeight, detectRatio, camId, fovZoom, draw);
@@ -27,6 +28,5 @@ extern "C" void __declspec(dllexport) __stdcall Detect(TransformData& outFaces, 
 
 extern "C" void __declspec(dllexport) __stdcall GetRawImageBytes(unsigned char* data, int width, int height)
 {
-	PoseEstimator.getRawImageBytes(data, width, height);
+	PoseEstimator.get_raw_image_bytes(data, width, height);
 }
-

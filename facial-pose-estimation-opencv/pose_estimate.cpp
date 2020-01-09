@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "pose_estimate.h"
+#include "utils.h"
 #include "opencv2/objdetect.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
@@ -41,7 +42,6 @@ Estimator::Estimator()
 	run_count = 0;
 	face_detect_res = 96;
 	line_render_res = 96;
-
 }
 
 int Estimator::init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw)
@@ -73,6 +73,156 @@ void Estimator::detect(TransformData& outFaces, ExpressionData* outExpression)
 	if (frame.empty())
 		return;
 
+	bounding_box_detect();
+
+	landmark_detect();
+
+	landmark_to_blendshapes(outExpression);
+
+	pnp_solve(outFaces);
+
+	if (draw_points)
+	{
+		// Draw points and axis on face
+		draw_solve();
+	}
+
+	run_count += 1;
+	cv::waitKey(1);
+}
+
+
+void Estimator::get_raw_image_bytes(unsigned char* data, int width, int height)
+{
+	if (frame.empty())
+		return;
+
+	cv::Mat tex_mat(height, width, frame.type());
+	cv::resize(frame, tex_mat, tex_mat.size(), cv::INTER_CUBIC);
+
+	//Convert from RGB to ARGB 
+	cv::Mat argb_img;
+	cv::cvtColor(tex_mat, argb_img, cv::COLOR_RGB2BGRA);
+	vector<cv::Mat> bgra;
+	cv::split(argb_img, bgra);
+	cv::swap(bgra[0], bgra[3]);
+	cv::swap(bgra[1], bgra[2]);
+	// Copy data back to pointer
+	memcpy(data, argb_img.data, argb_img.total() * argb_img.elemSize());
+}
+
+
+void Estimator::draw_solve()
+{
+	// Build axis from nose
+	vector<cv::Point3d> pose_axis_3d;
+	vector<cv::Point2d> pose_axis_2d;
+	pose_axis_3d.push_back(predicted_points_3d[0] + cv::Point3d(0, 0, 400.0));
+	pose_axis_3d.push_back(predicted_points_3d[0] + cv::Point3d(400, 0, 0));
+	pose_axis_3d.push_back(predicted_points_3d[0] + cv::Point3d(0, 400, 0));
+
+	// Project points
+	vector<cv::Point2d> predicted_face_2d;
+	cv::projectPoints(predicted_points_3d, rotation_vector, translation_vector, camera_matrix, dist_coeffs, predicted_face_2d);
+	cv::projectPoints(pose_axis_3d, rotation_vector, translation_vector, camera_matrix, dist_coeffs, pose_axis_2d);
+
+	// Draw points
+	for (int i = 0; i < 6; i++)
+	{
+		cv::circle(frame, cv::Point(landmark_points_2d[i].x, landmark_points_2d[i].y), 4, cv::Scalar(1, 0, 0), 3);
+		cv::circle(frame, cv::Point(predicted_face_2d[i].x, predicted_face_2d[i].y), 4, cv::Scalar(0, 0, 1), 3);
+	}
+
+	// Draw axis lines
+	cv::line(frame, predicted_face_2d[0], pose_axis_2d[0], cv::Scalar(255, 0, 0), 2);
+	cv::line(frame, predicted_face_2d[0], pose_axis_2d[1], cv::Scalar(0, 255, 0), 2);
+	cv::line(frame, predicted_face_2d[0], pose_axis_2d[2], cv::Scalar(0, 0, 255), 2);
+}
+
+
+void Estimator::pnp_solve(TransformData& outFaces)
+{
+	// Retrieve facial points with blenshapes applied
+	predicted_points_3d = pose.get_pose(expression);
+
+	// Prepair face points for perspective solve
+	landmark_points_2d.clear();
+	for (int id : triangulation_ids)
+	{
+		landmark_points_2d.push_back(cv::Point2d(face_landmark.part(id).x() * scale_ratio, face_landmark.part(id).y() * scale_ratio));
+	}
+
+	// Generate fake camera matrix
+	double focal_length = frame.cols*fov_zoom;
+	cv::Point2d center = cv::Point2d(frame.cols / 2, frame.rows / 2);
+	camera_matrix = (cv::Mat_<double>(3, 3) << focal_length, 0, center.x, 0, focal_length, center.y, 0, 0, 1);
+    dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type);
+
+	// Output rotation and translation, defaulting to in front of the camera
+	translation_vector(cv::Size(3, 1));
+	translation_vector(0, 0) = 0;
+	translation_vector(0, 1) = 0;
+	translation_vector(0, 2) = 3200;
+
+	rotation_vector(cv::Size(3, 1));
+	rotation_vector(0, 0) = -3.2f;
+	rotation_vector(0, 1) = 0.0f;
+	rotation_vector(0, 2) = 0.0f;
+	cv::Mat rot_mat;
+
+	// Solve for pose
+	cv::solvePnP(predicted_points_3d, landmark_points_2d, camera_matrix, dist_coeffs, rotation_vector, translation_vector, true, cv::SOLVEPNP_ITERATIVE);
+
+	// Convert rotation to Matrix
+	cv::Rodrigues(rotation_vector, rot_mat);
+
+	// Export transform
+	outFaces = TransformData(translation_vector.at<double>(0), translation_vector.at<double>(1), translation_vector.at<double>(2),
+		rot_mat.at<double>(2, 0), rot_mat.at<double>(2, 1), rot_mat.at<double>(2, 2),
+		rot_mat.at<double>(1, 0), rot_mat.at<double>(1, 1), rot_mat.at<double>(1, 2));
+}
+
+
+void Estimator::landmark_to_blendshapes(ExpressionData* outExpression)
+{
+	// Construct line image for Expression Detection
+	cv::Mat bs_mat = get_line_face(face_landmark);
+	cv::Mat bs_mat_flipped, bs_mat_32;
+	cv::flip(bs_mat, bs_mat_flipped, 1);
+
+	// Feed to network to get prediction
+	bs_mat_flipped.convertTo(bs_mat_32, CV_32F);
+	bs_mat_32 /= 127.5;
+	bs_mat_32 -= cv::Scalar(1, 1, 1);
+
+	expression_blob = cv::dnn::blobFromImage(bs_mat_32, 1, cv::Size(face_detect_res, face_detect_res), (0, 0, 0), false, false, CV_32F);
+	deep_expression.setInput(expression_blob);
+	expression = deep_expression.forward();
+
+	// Clamp network outputs, set data into struct
+	for (int i = 0; i < 51; i++)
+	{
+		float weight = expression.at<float>(0, i);
+		weight = utils::clamp(weight, 0.0f, 1.0f);
+		outExpression[i] = ExpressionData(weight);
+	}
+}
+
+
+void Estimator::landmark_detect()
+{
+	// Run landmark detection
+	cv::Mat half_frame(frame_height / scale_ratio, frame_width / scale_ratio, frame.type());
+	cv::resize(frame, half_frame, half_frame.size(), cv::INTER_CUBIC);
+	dlib::cv_image<dlib::bgr_pixel> dlib_image(half_frame);
+	face_landmark = landmark_detector(dlib_image, face_rect);
+	// Store nose point
+	prev_nose = cv::Point2f(face_landmark.part(34).x(), face_landmark.part(34).y());
+}
+
+
+void Estimator::bounding_box_detect()
+{
 	// Convert frame to blob, and drop into Face Box Detector Netowrk
 	cv::Mat blob, out;
 	blob = cv::dnn::blobFromImage(frame, 1.0, cv::Size(300, 300), (104, 117, 123), false, false);
@@ -117,154 +267,12 @@ void Estimator::detect(TransformData& outFaces, ExpressionData* outExpression)
 				largest_conf = confidence;
 				face_rect = new_face;
 			}
-
 		}
 	}
-
-	// Run landmark detection
-	cv::Mat half_frame(frame_height / scale_ratio, frame_width / scale_ratio, frame.type());
-	cv::resize(frame, half_frame, half_frame.size(), cv::INTER_CUBIC);
-	dlib::cv_image<dlib::bgr_pixel> dlib_image(half_frame);
-	dlib::full_object_detection face_landmark;
-	face_landmark = landmark_detector(dlib_image, face_rect);
-
-	// Construct line image for Expression Detection
-	cv::Mat bs_mat_old = GetLineFace(face_landmark);
-	cv::Mat bs_mat, img2;
-	cv::flip(bs_mat_old, bs_mat, 1);
-	cv::Mat expression_blob;
-
-	// Feed to network to get prediction
-	bs_mat.convertTo(img2, CV_32F);
-	img2 /= 127.5;
-	img2 -= cv::Scalar(1, 1, 1);
-
-	expression_blob = cv::dnn::blobFromImage(img2, 1, cv::Size(face_detect_res, face_detect_res), (0, 0, 0), false, false, CV_32F);
-	deep_expression.setInput(expression_blob);
-	cv::Mat expression = deep_expression.forward();
-
-	// Clamp network outputs, set data into struct
-	for (int i = 0; i < 51; i++)
-	{
-		float weight = expression.at<float>(0, i);
-		if (weight > 1.f)
-		{
-			weight = 1;
-		}
-		if (weight < 0.f)
-		{
-			weight = 0;
-		}
-		outExpression[i] = ExpressionData(weight);
-	}
-
-	// Retrieve facial points with blenshapes applied
-	vector < cv::Point3d> points3d;
-	points3d = pose.get_pose(expression);
-
-	// Store nose point
-	prev_nose = cv::Point2f(face_landmark.part(34).x(), face_landmark.part(34).y());
-
-	// Prepair face points for perspective solve
-	vector<cv::Point2d> image_points;
-	for (int id : triangulation_ids)
-	{
-		image_points.push_back(cv::Point2d(face_landmark.part(id).x() * scale_ratio, face_landmark.part(id).y() * scale_ratio));  
-	}
-
-	// Generate fake camera matrix
-	double focal_length = frame.cols*fov_zoom;
-	cv::Point2d center = cv::Point2d(frame.cols / 2, frame.rows / 2);
-	cv::Mat camera_matrix = (cv::Mat_<double>(3, 3) << focal_length, 0, center.x, 0, focal_length, center.y, 0, 0, 1);
-	cv::Mat dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type);
-
-	// Output rotation and translation, defaulting to in front of the camera
-	cv::Mat_<double> translation_vector(cv::Size(3, 1));
-	translation_vector(0, 0) = 0;
-	translation_vector(0, 1) = 0;
-	translation_vector(0, 2) = 3200;
-	cv::Mat_<double> rotation_vector(cv::Size(3, 1));
-	rotation_vector(0, 0) = -3.2f;
-	rotation_vector(0, 1) = 0.0f;
-	rotation_vector(0, 2) = 0.0f;
-	cv::Mat rot_mat;
-
-	// Solve for pose
-	cv::solvePnP(points3d, image_points, camera_matrix, dist_coeffs, rotation_vector, translation_vector, true, cv::SOLVEPNP_ITERATIVE);
-
-	// Convert rotation to Matrix
-	cv::Rodrigues(rotation_vector, rot_mat);
-
-	// Export transform
-	outFaces = TransformData(translation_vector.at<double>(0), translation_vector.at<double>(1), translation_vector.at<double>(2),
-		rot_mat.at<double>(2, 0), rot_mat.at<double>(2, 1), rot_mat.at<double>(2, 2),
-		rot_mat.at<double>(1, 0), rot_mat.at<double>(1, 1), rot_mat.at<double>(1, 2));
-
-	// Draw points and axis on face
-	if (draw_points)
-	{
-		vector<cv::Point3d> nose_end_point3D;
-		vector<cv::Point2d> nose_end_point2D;
-		nose_end_point3D.push_back(points3d[0] + cv::Point3d(0, 0, 400.0));
-		nose_end_point3D.push_back(points3d[0] + cv::Point3d(400, 0, 0));
-		nose_end_point3D.push_back(points3d[0] + cv::Point3d(0, 400, 0));
-
-		vector<cv::Point2d> face2d;
-		cv::projectPoints(points3d, rotation_vector, translation_vector, camera_matrix, dist_coeffs, face2d);
-		cv::projectPoints(nose_end_point3D, rotation_vector, translation_vector, camera_matrix, dist_coeffs, nose_end_point2D);
-
-		for (int i = 0; i < 6; i++)
-		{
-			cv::circle(frame, cv::Point(image_points[i].x, image_points[i].y), 4, cv::Scalar(1, 0, 0), 3);
-			cv::circle(frame, cv::Point(face2d[i].x, face2d[i].y), 4, cv::Scalar(0, 0, 1), 3);
-		}
-
-		line(frame, face2d[0], nose_end_point2D[0], cv::Scalar(255, 0, 0), 2);
-		line(frame, face2d[0], nose_end_point2D[1], cv::Scalar(0, 255, 0), 2);
-		line(frame, face2d[0], nose_end_point2D[2], cv::Scalar(0, 0, 255), 2);
-	}
-
-	run_count += 1;
-	cv::waitKey(1);
 }
 
 
-void Estimator::getRawImageBytes(unsigned char* data, int width, int height)
-{
-	if (frame.empty())
-		return;
-
-	cv::Mat tex_mat(height, width, frame.type());
-	cv::resize(frame, tex_mat, tex_mat.size(), cv::INTER_CUBIC);
-
-	//Convert from RGB to ARGB 
-	cv::Mat argb_img;
-	cv::cvtColor(tex_mat, argb_img, cv::COLOR_RGB2BGRA);
-	vector<cv::Mat> bgra;
-	cv::split(argb_img, bgra);
-	cv::swap(bgra[0], bgra[3]);
-	cv::swap(bgra[1], bgra[2]);
-	// Copy data back to pointer
-	memcpy(data, argb_img.data, argb_img.total() * argb_img.elemSize());
-}
-
-
-void buildLine(cv::Mat *image, cv::Mat x_points, cv::Mat y_points, vector<int> id_list, cv::Scalar color)
-{
-	vector<cv::Point> new_point_list;
-	cv::Mat line_image(image->rows, image->cols, CV_8UC3);
-	line_image = 0;
-
-	for (int id : id_list)
-	{
-		new_point_list.push_back(cv::Point(x_points.at<float>(id, 0), y_points.at<float>(id, 0)));
-	}
-	cv::polylines(line_image, new_point_list, false, color, 1, cv::LINE_AA, 0);
-	cv::max(line_image, *image, *image);
-}
-
-
-cv::Mat Estimator::GetLineFace(dlib::full_object_detection faceLandmark)
+cv::Mat Estimator::get_line_face(dlib::full_object_detection face_landmark)
 {
 	// Draw line image from Face Landmarks
 	int point_size = point_ids.size();
@@ -274,8 +282,8 @@ cv::Mat Estimator::GetLineFace(dlib::full_object_detection faceLandmark)
 	for (int id : point_ids)
 	{
 
-		x_points.at<float>(count, 0) = faceLandmark.part(id).x();
-		y_points.at<float>(count, 0) = faceLandmark.part(id).y();
+		x_points.at<float>(count, 0) = face_landmark.part(id).x();
+		y_points.at<float>(count, 0) = face_landmark.part(id).y();
 		count++;
 	}
 	cv::Mat bs_mat = cv::Mat::zeros(line_render_res, line_render_res, CV_8UC3);
@@ -300,69 +308,67 @@ cv::Mat Estimator::GetLineFace(dlib::full_object_detection faceLandmark)
 	vector<cv::Scalar>temp_colors(draw_colors);
 
 	// Chin
-	buildLine(&bs_mat, x_points, y_points, vector<int>{0, 1, 2, 3, 4}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{0, 1, 2, 3, 4}, temp_colors.back());
 	temp_colors.pop_back();
 	// Right Eye Broww
-	buildLine(&bs_mat, x_points, y_points, vector<int>{5, 6, 7, 8, 9}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{5, 6, 7, 8, 9}, temp_colors.back());
 	temp_colors.pop_back();
 	// Left Eye Brow
-	buildLine(&bs_mat, x_points, y_points, vector<int>{10, 11, 12, 13, 14}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{10, 11, 12, 13, 14}, temp_colors.back());
 	temp_colors.pop_back();
 	// Eyes
-	buildLine(&bs_mat, x_points, y_points, vector<int>{24, 25, 26, 27}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{24, 25, 26, 27}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{27, 28, 29, 24}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{27, 28, 29, 24}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{30, 31, 32, 33}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{30, 31, 32, 33}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{33, 34, 35, 30}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{33, 34, 35, 30}, temp_colors.back());
 	temp_colors.pop_back();
 	// Outer Mouth
-	buildLine(&bs_mat, x_points, y_points, vector<int>{36, 37, 38, 39}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{36, 37, 38, 39}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{39, 40, 41, 42}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{39, 40, 41, 42}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{42, 43, 44, 45}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{42, 43, 44, 45}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{45, 46, 47, 36}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{45, 46, 47, 36}, temp_colors.back());
 	temp_colors.pop_back();
 	// Inner Mouth
-	buildLine(&bs_mat, x_points, y_points, vector<int>{48, 49, 50}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{48, 49, 50}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{50, 51, 52}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{50, 51, 52}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{52, 53, 54}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{52, 53, 54}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{54, 55, 48}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{54, 55, 48}, temp_colors.back());
 	temp_colors.pop_back();
 	// Nose
-	buildLine(&bs_mat, x_points, y_points, vector<int>{15, 16, 17, 18}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{15, 16, 17, 18}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{18, 19}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{18, 19}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{19, 20, 21}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{19, 20, 21}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{21, 22, 23}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{21, 22, 23}, temp_colors.back());
 	temp_colors.pop_back();
 
-	buildLine(&bs_mat, x_points, y_points, vector<int>{18, 23}, temp_colors.back());
+	utils::build_line(&bs_mat, x_points, y_points, vector<int>{18, 23}, temp_colors.back());
 	temp_colors.pop_back();
 
 	return bs_mat;
 
 }
-
-
 

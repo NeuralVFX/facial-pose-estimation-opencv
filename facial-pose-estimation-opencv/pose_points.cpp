@@ -1,5 +1,5 @@
 #include "pose_points.h"
-
+#include "utils.h"
 
 
 pose_points::pose_points()
@@ -11,7 +11,6 @@ pose_points::pose_points()
 
 	for (int id : triangulation_ids)
 	{
-		std::cout << id << std::endl;
 		base_shape.at<float>(count, 0) = base_shape_arr[id][0];
 		base_shape.at<float>(count, 1) = base_shape_arr[id][1];
 		base_shape.at<float>(count, 2) = base_shape_arr[id][2];
@@ -39,6 +38,7 @@ pose_points::pose_points()
 	}
 }
 
+
 std::vector<cv::Point3d> pose_points::get_pose(cv::Mat expression)
 {
 	cv::Mat pose = cv::Mat(tri_len, 3, CV_32FC1);
@@ -48,15 +48,7 @@ std::vector<cv::Point3d> pose_points::get_pose(cv::Mat expression)
 	for (int i = 0; i < 51; i++)
 	{
 		float weight = expression.at<float>(0, i);
-
-		if (weight > 1.0f)
-		{
-			weight = 1.0f;
-		}
-		if (weight < 0.f)
-		{
-			weight = 0;
-		}
+		weight = utils::clamp(weight, 0.0f, 1.0f);
 		pose = pose + (weight*blend_shapes[i]);
 	}
 	// Add resulting blenshape to base pose
@@ -70,9 +62,9 @@ std::vector<cv::Point3d> pose_points::get_pose(cv::Mat expression)
 		cv::Point3d new_point((pose.at<float>(i, 0))*5000.f, (pose.at<float>(i, 1))*5000.f, (pose.at<float>(i, 2))*5000.f);
 		out_points.push_back(new_point);
 	}
-
 	return out_points;
 }
+
 
 pose_points::~pose_points()
 {

@@ -81,8 +81,17 @@ public:
 	// Storage for reusable variables
 	cv::Point2f prev_nose;
 	vector< vector<cv::Point2f> > landmarks;
+	dlib::full_object_detection face_landmark;
+	cv::Mat expression_blob;
 	dlib::rectangle face_rect;
 	cv::Mat frame;
+	cv::Mat expression;
+	vector <cv::Point3d> predicted_points_3d;
+	vector <cv::Point2d> landmark_points_2d;
+	cv::Mat_<double> translation_vector;
+	cv::Mat_<double> rotation_vector;
+	cv::Mat camera_matrix;
+	cv::Mat dist_coeffs;
 
 	// Storage for constant data arrays
 	const vector<int> point_ids = { 6,7,8,9,10,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,
@@ -98,6 +107,7 @@ public:
 	// pose object
 	pose_points pose;
 
+
 public:
 
 	Estimator();
@@ -108,10 +118,19 @@ public:
 
 	void detect(TransformData& outFaces, ExpressionData* outExpression);
 
-	cv::Mat GetLineFace(dlib::full_object_detection landmarks);
+	void bounding_box_detect();
 
-	void getRawImageBytes(unsigned char* data, int width, int height);
+	void landmark_detect();
+
+	void draw_solve();
+
+	void landmark_to_blendshapes(ExpressionData* outExpression);
+
+	void pnp_solve(TransformData& outFaces);
+
+	cv::Mat get_line_face(dlib::full_object_detection landmarks);
+
+	void get_raw_image_bytes(unsigned char* data, int width, int height);
 
 };
-
 
