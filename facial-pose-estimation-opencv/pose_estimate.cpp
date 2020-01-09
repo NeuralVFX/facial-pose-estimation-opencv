@@ -39,7 +39,7 @@ Estimator::Estimator()
 	frame_height = 1080;
 	scale_ratio = 1;
 	run_count = 0;
-	face_detect_res = 64;
+	face_detect_res = 96;
 	line_render_res = 96;
 
 }
@@ -48,8 +48,6 @@ int Estimator::init(int& outCameraWidth, int& outCameraHeight, int detectRatio, 
 {
 	fov_zoom = fovZoom;
 	scale_ratio = detectRatio;
-	face_detect_res = 96;
-	line_render_res = 96;
 	draw_points = draw;
 
 	_capture.open(camId);
