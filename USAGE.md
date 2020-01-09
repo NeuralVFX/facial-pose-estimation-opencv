@@ -23,8 +23,8 @@ git clone https://github.com/NeuralVFX/realtime-head-pose-open-cv.git
 
 ## Compile
 - Compile in release mode
-- `head-pose-opencv.dll` will be created in the `\x64\Release` directory
+- `facial-pose-estimation-opencv.dll` will be created in the `\x64\Release` directory
 
 ## Use
-- Detailed instuction for using with Unity, and an example project using `head-pose-opencv.dll` can be found here:  https://github.com/NeuralVFX/unity-head-pose-example
+- Detailed instuction for using with Unity, and an example project using `facial-pose-estimation-opencv.dll` can be found here:  https://github.com/NeuralVFX/facial-pose-estimation-unity
 
