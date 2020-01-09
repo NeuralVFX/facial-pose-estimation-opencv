@@ -136,10 +136,12 @@
     <ClCompile Include="export_wrapper.cpp" />
     <ClCompile Include="dlib_source.cpp" />
     <ClCompile Include="pose_points.cpp" />
+    <ClCompile Include="utils.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pose_estimate.h" />
     <ClInclude Include="pose_points.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
