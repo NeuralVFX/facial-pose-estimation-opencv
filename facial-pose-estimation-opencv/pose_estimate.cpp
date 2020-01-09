@@ -145,7 +145,7 @@ void Estimator::pnp_solve(TransformData& outFaces)
 	double focal_length = frame.cols*fov_zoom;
 	cv::Point2d center = cv::Point2d(frame.cols / 2, frame.rows / 2);
 	camera_matrix = (cv::Mat_<double>(3, 3) << focal_length, 0, center.x, 0, focal_length, center.y, 0, 0, 1);
-    dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type);
+	dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type);
 
 	// Output rotation and translation, defaulting to in front of the camera
 	translation_vector(cv::Size(3, 1));
