@@ -6,24 +6,13 @@
 
 #include "pose_estimate.h"
 #include "utils.h"
-#include "opencv2/objdetect.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/imgproc.hpp"
-#include "opencv2/dnn.hpp"
-#include "opencv2/dnn/shape_utils.hpp"
-#include "opencv2/opencv.hpp"
-#include "opencv2/imgproc.hpp"
-#include "dlib/image_processing.h"
-#include "dlib/opencv.h"
-#include "dlib/image_processing/frontal_face_detector.h"
 
-using namespace std;
 
 Estimator::Estimator()
 {
+	// Load networks
 	deep_expression = cv::dnn::readNet(expression_model);
 	deep_expression.setPreferableTarget(cv::dnn::DNN_TARGET_OPENCL_FP16);
-	// Load networks
 	box_detector = cv::dnn::readNetFromCaffe(caffe_config_file, caffe_weight_file);
 	box_detector.setPreferableTarget(cv::dnn::DNN_TARGET_OPENCL_FP16);
 	landmark_detector = dlib::shape_predictor();
@@ -149,7 +138,7 @@ void Estimator::pnp_solve(TransformData& outFaces)
 	landmark_points_2d.clear();
 	for (int id : triangulation_ids)
 	{
-		landmark_points_2d.push_back(cv::Point2d(face_landmark.part(id).x() * scale_ratio, face_landmark.part(id).y() * scale_ratio));
+		landmark_points_2d.push_back(cv::Point2d(face_landmarks.part(id).x() * scale_ratio, face_landmarks.part(id).y() * scale_ratio));
 	}
 
 	// Generate fake camera matrix
@@ -186,7 +175,7 @@ void Estimator::pnp_solve(TransformData& outFaces)
 void Estimator::landmark_to_blendshapes(ExpressionData* outExpression)
 {
 	// Construct line image for Expression Detection
-	cv::Mat bs_mat = get_line_face(face_landmark);
+	cv::Mat bs_mat = get_line_face(face_landmarks);
 	cv::Mat bs_mat_flipped, bs_mat_32;
 	cv::flip(bs_mat, bs_mat_flipped, 1);
 
@@ -195,7 +184,7 @@ void Estimator::landmark_to_blendshapes(ExpressionData* outExpression)
 	bs_mat_32 /= 127.5;
 	bs_mat_32 -= cv::Scalar(1, 1, 1);
 
-	expression_blob = cv::dnn::blobFromImage(bs_mat_32, 1, cv::Size(face_detect_res, face_detect_res), (0, 0, 0), false, false, CV_32F);
+	cv::Mat expression_blob = cv::dnn::blobFromImage(bs_mat_32, 1, cv::Size(face_detect_res, face_detect_res), (0, 0, 0), false, false, CV_32F);
 	deep_expression.setInput(expression_blob);
 	expression = deep_expression.forward();
 
@@ -215,9 +204,9 @@ void Estimator::landmark_detect()
 	cv::Mat half_frame(frame_height / scale_ratio, frame_width / scale_ratio, frame.type());
 	cv::resize(frame, half_frame, half_frame.size(), cv::INTER_CUBIC);
 	dlib::cv_image<dlib::bgr_pixel> dlib_image(half_frame);
-	face_landmark = landmark_detector(dlib_image, face_rect);
+	face_landmarks = landmark_detector(dlib_image, face_rect);
 	// Store nose point
-	prev_nose = cv::Point2f(face_landmark.part(34).x(), face_landmark.part(34).y());
+	prev_nose = cv::Point2f(face_landmarks.part(34).x(), face_landmarks.part(34).y());
 }
 
 
