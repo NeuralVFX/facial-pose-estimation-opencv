@@ -4,8 +4,11 @@
 This repository is a Visual Studio Project, it contains a `C++` implimentation of Realtime Facial and Headpose Estimation using `OpenCV`, `DLIB` and a `CNN` trained in `Pytorch`.
 
 This is one of three repositories which together form the whole project I wrote about in this blog post: [AR Facial Pose Estimation](http://neuralvfx.com/augmented-reality/ar-facial-pose-estimation/)
+
 [facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
+
 [facial-pose-estimation-opencvh](https://github.com/NeuralVFX/facial-pose-estimation-opencv) - You are here.
+
 [facial-pose-estimation-unityh](https://github.com/NeuralVFX/facial-pose-estimation-unity)
 
 
