@@ -5,11 +5,9 @@ This repository is a Visual Studio Project, it contains a `C++` implimentation o
 
 This is one of three repositories which together form the whole project I wrote about in this blog post: [AR Facial Pose Estimation](http://neuralvfx.com/augmented-reality/ar-facial-pose-estimation/)
 
-[facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
-
-[facial-pose-estimation-opencvh](https://github.com/NeuralVFX/facial-pose-estimation-opencv) - You are here.
-
-[facial-pose-estimation-unityh](https://github.com/NeuralVFX/facial-pose-estimation-unity)
+- [facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
+- [facial-pose-estimation-opencv](https://github.com/NeuralVFX/facial-pose-estimation-opencv) - You are here.
+- [facial-pose-estimation-unity](https://github.com/NeuralVFX/facial-pose-estimation-unity)
 
 
 
