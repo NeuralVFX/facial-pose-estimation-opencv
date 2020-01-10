@@ -1,13 +1,22 @@
 ![](examples/unity_example.gif)
 # Facial-Pose-Estimation-OpenCV
 
-This project is a C++ implimentation of realtime facial and headpose tracking using OpenCV, DLIB and a custom Neural Net.
+This repository is a Visual Studio Project, it contains a `C++` implimentation of Realtime Facial and Headpose Estimation using `OpenCV`, `DLIB` and a `CNN` trained in `Pytorch`.
 
-## Interesting Stuff
+## About
+This is one of three repositories which together form a larger project, these are the three repositories:
+- [facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
+- [facial-pose-estimation-opencv](https://github.com/NeuralVFX/facial-pose-estimation-opencv) - You are here.
+- [facial-pose-estimation-unity](https://github.com/NeuralVFX/facial-pose-estimation-unity)
 
-- The output of the Visual Studio Project is a `DLL`, which can be added to a Unity Project and accessed through C#
-- The DLL outputs the transform matrix of the head, a set of blendshapes, and the pixels of the image
-- Runs on a live video stream
+This blog post describes the whole project: [AR Facial Pose Estimation](http://neuralvfx.com/augmented-reality/ar-facial-pose-estimation/)
+
+
+## Extra Info
+- The output of the Visual Studio Project is a `DLL`
+- The `DLL` outputs the `Transform Matrix`, a set of `Blendshape Values`, and the pixels of the image
+- An example of using this `DLL` with `Unity` can be found in this project: [facial-pose-estimation-unity](https://github.com/NeuralVFX/facial-pose-estimation-unity)
+- The `Neural Net` used by the project can be found here: [facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
 
 ## Estimation Pipeline Diagram
 ![](examples/pipeline_b.png)
