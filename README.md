@@ -1,4 +1,4 @@
-![](examples/example_a.gif)
+![](examples/example_b.gif)
 # Facial-Pose-Estimation-OpenCV
 
 This repository is a Visual Studio Project, it contains a `C++` implimentation of Realtime Facial and Headpose Estimation using `OpenCV`, `DLIB` and a `CNN` trained in `Pytorch`.
