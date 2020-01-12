@@ -21,23 +21,26 @@ Estimator::Estimator()
 	// Set starting face box value
 	face_rect = dlib::rectangle(dlib::point(0, 0), dlib::point(1, 1));
 
-	// pose object
-	pose = pose_points();
-
 	// Set resolution
 	frame_width = 1920;
 	frame_height = 1080;
-	scale_ratio = 1;
 	run_count = 0;
+
+	// Face detection res
 	face_detect_res = 96;
 	line_render_res = 96;
 }
 
-int Estimator::init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw)
+int Estimator::init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw, bool lockEyesNose)
 {
+	// Set parameters from Unity
+	lock_eyes_nose = lockEyesNose;
 	fov_zoom = fovZoom;
-	scale_ratio = detectRatio;
+	detect_ratio = detectRatio;
 	draw_points = draw;
+
+	// Pose object
+	pose = pose_points(lockEyesNose);
 
 	_capture.open(camId);
 	if (!_capture.isOpened())
@@ -118,8 +121,8 @@ void Estimator::draw_solve()
 	// Draw points
 	for (int i = 0; i < 6; i++)
 	{
-		cv::circle(frame, cv::Point(landmark_points_2d[i].x, landmark_points_2d[i].y), 4, cv::Scalar(1, 0, 0), 3);
-		cv::circle(frame, cv::Point(predicted_face_2d[i].x, predicted_face_2d[i].y), 4, cv::Scalar(0, 0, 1), 3);
+		cv::circle(frame, cv::Point(landmark_points_2d[i].x, landmark_points_2d[i].y), 4, cv::Scalar(255, 0, 0), 3);
+		cv::circle(frame, cv::Point(predicted_face_2d[i].x, predicted_face_2d[i].y), 4, cv::Scalar(0, 0, 255), 3);
 	}
 
 	// Draw axis lines
@@ -138,7 +141,7 @@ void Estimator::pnp_solve(TransformData& outFaces)
 	landmark_points_2d.clear();
 	for (int id : triangulation_ids)
 	{
-		landmark_points_2d.push_back(cv::Point2d(face_landmarks.part(id).x() * scale_ratio, face_landmarks.part(id).y() * scale_ratio));
+		landmark_points_2d.push_back(cv::Point2d(face_landmarks.part(id).x() * detect_ratio, face_landmarks.part(id).y() * detect_ratio));
 	}
 
 	// Generate fake camera matrix
@@ -148,15 +151,13 @@ void Estimator::pnp_solve(TransformData& outFaces)
 	dist_coeffs = cv::Mat::zeros(4, 1, cv::DataType<double>::type);
 
 	// Output rotation and translation, defaulting to in front of the camera
-	translation_vector(cv::Size(3, 1));
-	translation_vector(0, 0) = 0;
-	translation_vector(0, 1) = 0;
-	translation_vector(0, 2) = 3200;
+	translation_vector.at< double>(0) = 0;
+	translation_vector.at< double>(1) = 0;
+	translation_vector.at< double>(2) = 3200;
 
-	rotation_vector(cv::Size(3, 1));
-	rotation_vector(0, 0) = -3.2f;
-	rotation_vector(0, 1) = 0.0f;
-	rotation_vector(0, 2) = 0.0f;
+	rotation_vector.at< double>(0) = -3.2f;
+	rotation_vector.at< double>(1) = 0.0f;
+	rotation_vector.at< double>(2) = 0.0f;
 	cv::Mat rot_mat;
 
 	// Solve for pose
@@ -201,7 +202,7 @@ void Estimator::landmark_to_blendshapes(ExpressionData* outExpression)
 void Estimator::landmark_detect()
 {
 	// Run landmark detection
-	cv::Mat half_frame(frame_height / scale_ratio, frame_width / scale_ratio, frame.type());
+	cv::Mat half_frame(frame_height / detect_ratio, frame_width / detect_ratio, frame.type());
 	cv::resize(frame, half_frame, half_frame.size(), cv::INTER_CUBIC);
 	dlib::cv_image<dlib::bgr_pixel> dlib_image(half_frame);
 	face_landmarks = landmark_detector(dlib_image, face_rect);
@@ -229,10 +230,10 @@ void Estimator::bounding_box_detect()
 		if (confidence > .5)
 		{
 			// Get dimensions
-			int x1 = static_cast<int>(detectionMat.at<float>(i, 3) * (frame_width / scale_ratio));
-			int y1 = static_cast<int>(detectionMat.at<float>(i, 4) * (frame_height / scale_ratio));
-			int x2 = static_cast<int>(detectionMat.at<float>(i, 5) * (frame_width / scale_ratio));
-			int y2 = static_cast<int>(detectionMat.at<float>(i, 6) * (frame_height / scale_ratio));
+			int x1 = static_cast<int>(detectionMat.at<float>(i, 3) * (frame_width / detect_ratio));
+			int y1 = static_cast<int>(detectionMat.at<float>(i, 4) * (frame_height / detect_ratio));
+			int x2 = static_cast<int>(detectionMat.at<float>(i, 5) * (frame_width / detect_ratio));
+			int y2 = static_cast<int>(detectionMat.at<float>(i, 6) * (frame_height / detect_ratio));
 
 			// Generate square dimensions
 			face_width = max(x2 - x1, y2 - y1) / 2.8;
@@ -270,7 +271,6 @@ cv::Mat Estimator::get_line_face(dlib::full_object_detection face_landmark)
 	int count = 0;
 	for (int id : point_ids)
 	{
-
 		x_points.at<float>(count, 0) = face_landmark.part(id).x();
 		y_points.at<float>(count, 0) = face_landmark.part(id).y();
 		count++;
