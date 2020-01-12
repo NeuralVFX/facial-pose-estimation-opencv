@@ -4,6 +4,11 @@
 
 pose_points::pose_points()
 {
+}
+
+
+pose_points::pose_points(bool lock_eyes_nose)
+{
 	// Populate needed points of base pose into smaller array
 	base_shape = cv::Mat(tri_len, 3, CV_32FC1);
 	int count;
@@ -25,8 +30,18 @@ pose_points::pose_points()
 
 		for (int id : triangulation_ids)
 		{
-			// Skip over eyes and nose, more stable without them moving
-			if (id != 33 || id != 24 || id != 15 || id != 18)
+			// Option to skip over eyes and nose, sometimes more stable
+			if (lock_eyes_nose)
+			{
+				if (id != 33 || id != 24 || id != 15 || id != 18)
+				{
+					new_bs.at<float>(count, 0) = blend_shapes_arr[b][id][0];
+					new_bs.at<float>(count, 1) = blend_shapes_arr[b][id][1];
+					new_bs.at<float>(count, 2) = blend_shapes_arr[b][id][2];
+				}
+
+			}
+			else
 			{
 				new_bs.at<float>(count, 0) = blend_shapes_arr[b][id][0];
 				new_bs.at<float>(count, 1) = blend_shapes_arr[b][id][1];
