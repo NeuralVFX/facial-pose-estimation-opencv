@@ -40,7 +40,7 @@ int Estimator::init(int& outCameraWidth, int& outCameraHeight, int detectRatio, 
 	draw_points = draw;
 
 	// Pose object
-	pose = pose_points(lockEyesNose);
+	pose = pose_points(lock_eyes_nose);
 
 	_capture.open(camId);
 	if (!_capture.isOpened())
