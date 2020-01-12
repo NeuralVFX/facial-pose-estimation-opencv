@@ -47,7 +47,7 @@ public:
 	cv::VideoCapture _capture;
 
 	// Pose object
-	pose_points pose;
+	pose_points pose = pose_points(true);
 
 	// Constant strings
 	const string caffe_config_file = "./deploy.prototxt";
@@ -61,7 +61,7 @@ public:
 	// Capture dimensions
 	int frame_width;
 	int frame_height;
-	int scale_ratio;
+	int detect_ratio;
 
 	// Face detection res and line render res
 	int face_detect_res;
@@ -72,16 +72,19 @@ public:
 	dlib::shape_predictor landmark_detector;
 	cv::dnn::Net deep_expression;
 
+	/*
+	Storage for parameters from Unity
+	*/
 	// Camera Zoom
 	float fov_zoom;
-
 	// Draw Axis on face
 	bool draw_points;
+	// Whether to animate eyes and nose in PnP sove
+	bool lock_eyes_nose;
 
 	/*
     Storage for reusable variables
 	*/
-
 	// Dlib landmark output
 	dlib::full_object_detection face_landmarks;
 	// Stream image storage
@@ -92,8 +95,8 @@ public:
 	vector <cv::Point3d> predicted_points_3d;
 	vector <cv::Point2d> landmark_points_2d;
 	// Output transforms for PnP solve
-	cv::Mat_<double> translation_vector;
-	cv::Mat_<double> rotation_vector;
+	cv::Mat translation_vector = cv::Mat(cv::Size(3, 1), cv::DataType<double>::type);
+	cv::Mat rotation_vector = cv::Mat(cv::Size(3, 1), cv::DataType<double>::type);
 	// Camera initiation 
 	cv::Mat camera_matrix;
 	cv::Mat dist_coeffs;
@@ -107,7 +110,6 @@ public:
  	/*
 	Storage for constant data arrays
 	*/
-
 	const vector<int> point_ids = { 6,7,8,9,10,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,
 		33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67 };
 
@@ -123,7 +125,7 @@ public:
 
 	Estimator();
 
-	int init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw);
+	int init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw, bool lockEyesNose);
 
 	void close();
 
