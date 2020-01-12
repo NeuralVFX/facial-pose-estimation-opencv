@@ -17,11 +17,23 @@ class pose_points
 public:
 	pose_points();
 
-	vector<cv::Mat>  blend_shapes;
-	cv::Mat base_shape;
-	vector<int> triangulation_ids = { 18,2,24,33,36,42 };
-	int tri_len = 6;
+	pose_points(bool lock_eyes_nose);
+
 	vector<cv::Point3d> get_pose(cv::Mat expression);
+
+public:
+
+	// Non deformed head
+	cv::Mat base_shape;
+
+	// Blend shapes for head
+	vector<cv::Mat>  blend_shapes;
+
+	// IDs for PnP Solve
+	vector<int> triangulation_ids = { 18,2,24,33,36,42 };
+
+	// ID coutn for loops
+	int tri_len = 6;
 
 	// array of points for base pose from maya file
 	float base_shape_arr[56][3] = { { -0.0377, -0.0691, 0.0275 },
