@@ -8,9 +8,9 @@
 Estimator PoseEstimator = Estimator();
 
 
-extern "C" int __declspec(dllexport) __stdcall  Init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw)
+extern "C" int __declspec(dllexport) __stdcall  Init(int& outCameraWidth, int& outCameraHeight, int detectRatio, int camId, float fovZoom, bool draw, bool lockEyesNose)
 {
-	return PoseEstimator.init(outCameraWidth, outCameraHeight, detectRatio, camId, fovZoom, draw);
+	return PoseEstimator.init(outCameraWidth, outCameraHeight, detectRatio, camId, fovZoom, draw, lockEyesNose);
 }
 
 
