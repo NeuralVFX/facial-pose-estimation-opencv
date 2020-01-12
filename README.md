@@ -1,4 +1,4 @@
-![](examples/example_b.gif)
+![](https://github.com/NeuralVFX/facial-pose-estimation-unity/blob/master/examples/example_celeb_a.gif)
 # Facial-Pose-Estimation-OpenCV
 
 This repository is a Visual Studio Project, it contains a `C++` implimentation of Realtime Facial and Headpose Estimation using `OpenCV`, `DLIB` and a `CNN` trained in `Pytorch`.
@@ -19,7 +19,7 @@ This blog post describes the whole project: [AR Facial Pose Estimation](http://n
 - The `Neural Net` used by the project can be found here: [facial-pose-estimation-pytorch](https://github.com/NeuralVFX/facial-pose-estimation-pytorch)
 
 ## Estimation Pipeline Diagram
-![](examples/pipeline_b.png)
+![](examples/pipeline_c.png)
 
 ## Code Usage
 Usage instructions found here: [user manual page](USAGE.md).

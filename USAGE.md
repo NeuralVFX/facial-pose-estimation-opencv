@@ -7,7 +7,7 @@
 - Clone this repo:
 
 ```bash
-git clone https://github.com/NeuralVFX/realtime-head-pose-open-cv.git
+git clone https://github.com/NeuralVFX/facial-pose-estimation-opencv.git
 ```
 
 ## Setting Up Visual Studio
